@@ -23,32 +23,14 @@ object KmeansClustering {
 
   def getMinimumIndex(centroids:Array[Double],metric:Double):Int={
     var min:Double = 100000000.0
-    //println(centroids(1))
     var minIndex :Int = 0
     for( i <- 0 to 2 ){
-	// println(centroids(i))
-        // println(loudness)
-         var diff = Math.abs(centroids(i)-metric)
-        //println("diff is ***********************")
-        //println(diff)
+	       var diff = Math.abs(centroids(i)-metric)
          if(diff< min){
            min = Math.abs(centroids(i)-metric)
            minIndex = i
          }
     }
-//    if (minIndex == 0){
-//      accumArray(0).add(metric)
-//      accumArray(1).add(1)
-//      //println(accumArray(0).value)
-//    }
-//    if (minIndex == 1){
-//      accumArray(2).add(metric)
-//      accumArray(3).add(1)
-//    }
-//    if (minIndex == 2){
-//      accumArray(4).add(metric)
-//      accumArray(5).add(1)
-//    }
 
     return minIndex
   }
@@ -71,15 +53,6 @@ object KmeansClustering {
 
   def updateCentroid(frame:RDD[(String,Double,Int)],c:Array[Double]):Array[Double] ={
 
-//    val reduced = frame.map(row=>(row._2,row._3))
-//
-//
-//    val quiet = reduced.filter(row => row._2 == 0).map(row=>row._1)
-//    val medium = reduced.filter(row=>row._2 ==1).map(row=>row._1)
-//    val loud = reduced.filter(row=>row._2==2).map(row=>row._1)
-
-
-
     val groupByCluser = frame
       .map(row=>(row._3,row._2))
       .mapValues(x=>(x,1))
@@ -93,23 +66,6 @@ object KmeansClustering {
     }
 
 
-//    var c1 = quiet.sum/quiet.count
-//    if(c1.isNaN){
-//     c1 = c(0)
-//   }
-//    var c2 = medium.sum/medium.count
-//    if(c2.isNaN){
-//     c2 = c(1)
-//   }
-//
-//   var c3 = loud.sum/loud.count
-//   if(c3.isNaN){
-//     c3 = c(2)
-//   }
-//
-//
-//    var centroids =  Array(c1,c2,c3)
-    //return centroids
     return c
   }
 
@@ -141,13 +97,8 @@ object KmeansClustering {
 
   def assignCentroids(frame:RDD[(String,Double, Int)],centroids:Array[Double]):RDD[(String,Double, Int)]= {
       println("In Assign Centroids")
-//     for(m <- 0 to accumArray.length-1){
-//      //println(accumArray(m).value)
-//      accumArray(m).reset()
-//      //println(accumArray(m).value)
-//      }
-      var f = frame.map(row => (row._1,row._2,getMinimumIndex(centroids,row._2)))
-      return f
+      frame.map(row => (row._1,row._2,getMinimumIndex(centroids,row._2))).persist()
+      //return f
   }
 
   def assignCentroidsCombined(frame:RDD[(String,Array[Double],Array[Int])], centroidArray:Array[Array[Double]]):RDD[(String,Array[Double],Array[Int])]={
@@ -165,14 +116,6 @@ object KmeansClustering {
 
    for(i <- 1 to 10){
       f = assignCentroids(f,c)
-//      f.count()
-//      centroids(0) = accumArray(0).value/accumArray(1).value
-//      centroids(1) = accumArray(2).value/accumArray(3).value
-//      centroids(2) = accumArray(4).value/accumArray(5).value
-
-//      for(m <- 0 to accumArray.length-1){
-//        println(accumArray(m))
-//      }
 
       c = updateCentroid(f,c)
       for(j <- 0 to 2){
@@ -227,6 +170,8 @@ object KmeansClustering {
     */
     var output = new ListBuffer[String]()
 
+    val t1 = System.currentTimeMillis()
+
     /*
       Load the contents song file into a val
     */
@@ -240,17 +185,6 @@ object KmeansClustering {
     lines.persist()
 
 
-//    val sum1 = sc.doubleAccumulator("sum1")
-//    val count1 = sc.doubleAccumulator("count1")
-//
-//    val sum2 = sc.doubleAccumulator("sum2")
-//    val count2 = sc.doubleAccumulator("count2")
-//
-//    val sum3 = sc.doubleAccumulator("sum3")
-//    val count3 = sc.doubleAccumulator("count3")
-
-
-//    val accumArray : Array[DoubleAccumulator] = Array(sum1,count1,sum2,count2,sum3,count3)
 
 
 
@@ -259,41 +193,104 @@ object KmeansClustering {
       pick up songId , song title and loudness from each row
       sortBy loudness and pick top 5
     */
-    val flines = lines.filter(row => isDoubleNumber(row(6)))
+      val flines = lines.filter(row => isDoubleNumber(row(6)))
     val loudnessValues = flines.map(row =>(row(23), row(6).toDouble,-1))
     var centroids:Array[Double]  = Array(0.0,-10.0,-30.0)
     var f1 = kmeans(loudnessValues,centroids)
 
-    f1.saveAsTextFile("outputForLoudness")
+    val t2 = System.currentTimeMillis();
 
-
-    val flines2 = lines.filter(row => isDoubleNumber(row(7)))
-    val temp = flines2.map(row =>(row(23), row(7).toDouble,-1))
-    centroids = Array(0.0,100.0,200.0)
-    var f2 = kmeans(temp,centroids)
-    f2.saveAsTextFile("outputForTempo")
-
-    val flines3 = lines.filter(row => isDoubleNumber(row(5)))
-    val duration = flines3.map(row =>(row(23), row(5).toDouble,-1))
-    centroids = Array(0.0,100.0,200.0)
-    var f3 = kmeans(duration,centroids)
-    f3.saveAsTextFile("outputForDuration")
-
-    val flines4 = lines.filter(row => isDoubleNumber(row(25)))
-    val songhotness = flines4.map(row =>(row(23), row(25).toDouble,-1))
-    centroids = Array(0.0,0.3,0.7)
-    var f4 = kmeans(songhotness,centroids)
-    f4.saveAsTextFile("outputForSonghotness")
-
-
-
-
-    //    val df = flines.map(row=> (row(23),Array(row(6).toDouble,row(7).toDouble,row(5).toDouble,row(25).toDouble),Array(-1,-1,-1,-1)))
-//    var frame = kmeansReloaded(df)
-//    val deflated = frame.map(row=> (row._1,row._2(0),row._3(0),row._2(1),row._3(1),row._2(2),row._3(2),row._2(3),row._3(3)))
+    println((t2-t1)/1000)
+//    val loudnessValues = flines.map(row =>(row(23), row(6).toDouble))
+//    //loudnessValues.persist()
+//    var clusterSize = loudnessValues.count()
+//    var f = loudnessValues
+//   // while(clusterSize>3){
+//       println("Cluster Size")
+//       println(clusterSize)
+//       f = agglomerativeClusetring(f,sc)
+//       clusterSize = f.count()
+//    //}
 //
-//    //deflated.saveAsTextFile("outputReloaded")
+//
+//
+//    f.saveAsTextFile("outputForAgglomerativeLoudness")
+
+
+//    val flines2 = lines.filter(row => isDoubleNumber(row(7)))
+//    val temp = flines2.map(row =>(row(23), row(7).toDouble,-1))
+//    centroids = Array(0.0,100.0,200.0)
+//    var f2 = kmeans(temp,centroids)
+//    f2.saveAsTextFile("outputForTempo")
+//
+//    val flines3 = lines.filter(row => isDoubleNumber(row(5)))
+//    val duration = flines3.map(row =>(row(23), row(5).toDouble,-1))
+//    centroids = Array(0.0,100.0,200.0)
+//    var f3 = kmeans(duration,centroids)
+//    f3.saveAsTextFile("outputForDuration")
+//
+//    val flines4 = lines.filter(row => isDoubleNumber(row(25)))
+//    val songhotness = flines4.map(row =>(row(23), row(25).toDouble,-1))
+//    centroids = Array(0.0,0.3,0.7)
+//    var f4 = kmeans(songhotness,centroids)
+//    f4.saveAsTextFile("outputForSonghotness")
+
+
 
 
   }
+
+  def test(args:RDD[(String,(String,Iterable[String]))]) = {
+
+  }
+
+  def commanlity(artFile:String,simArtFile:String,sc:SparkContext)={
+      val artistTermsRDD = sc.textFile(artFile)
+      val simArtFileRDD = sc.textFile(simArtFile)
+
+      val header1 = artistTermsRDD.first()
+      val header2 = simArtFileRDD.first()
+
+      val artistTermLines = artistTermsRDD.filter(row => row!=header1).map(row => row.split(";")).map(row => (row(0),row(1))).groupByKey().map{case(a,b) => (a,b.toSet)}
+      val similarArtLines = simArtFileRDD.filter(row=>row!=header2).map(row=>row.split(";")).map(row=>(row(0),row(1)))
+
+      val joinedSimArtistTerms = similarArtLines.join(artistTermLines)
+
+      val temp = joinedSimArtistTerms.map{case (a,(b,c)) => (b,(a,c))}.join(artistTermLines)
+
+      val graphEdeges = temp.map{case (a,((b,c),d)) => (a,b,c.intersect(d).size)}
+
+
+
+
+
+  }
+
+
+
+
+  def trendSetters(sc:SparkContext,songs:RDD[Array[String]],artistSimilarity:RDD[Array[String]],artistTerms:RDD[Array[String]])
+  : RDD[(String,Double)] = {
+
+    val artistsByFamiliarity = songs.filter(row => isDoubleNumber(row(19)))
+      .map(rec => (rec(16),rec(19).toDouble))
+    val meanArtistFamiliarity = artistsByFamiliarity.mapValues(x => (x, 1))
+      .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2))
+      .mapValues(y => 1.0 * y._1 / y._2)
+
+    val artistSongs = songs.map(x => (x(16), 1)).groupByKey().map(x => (x._1,x._2.size))
+
+    val similarArtists = artistSimilarity.map(x => (x(0), x(1))).groupByKey().map(x => (x._1,x._2.size))
+
+
+    val popularity = artistSongs.join(similarArtists)
+                       .map(x => (x._1,(x._2._1) * (x._2._2)))
+                       .join(meanArtistFamiliarity)
+                          .map(x => (x._1 ,x._2._2 * x._2._1))
+                          .sortBy(_._2,false)
+    return popularity
+
+  }
+
+
 }
