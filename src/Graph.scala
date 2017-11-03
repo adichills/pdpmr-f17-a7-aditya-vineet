@@ -4,6 +4,12 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.util.control.Exception.allCatch
 
+
+/*
+
+    Author : Aditya and Vineet
+ */
+
 object Graph {
 
   def isDoubleNumber(s: String): Boolean = (allCatch opt s.toDouble).isDefined
@@ -85,7 +91,14 @@ object Graph {
   }
   
 
+
   // This method generates the Commonailty graph edges
+  // This method computes the artists popularity
+  // Input : lines:RDD[Array[String]] lines from the song_info.csv without the header
+  //
+  //        artitstSimilarity:RDD[Array[String]] lines from the artist_similarity.csv without the header
+  //        artistTerm :RDD[Array[String]] lines from the artistt terms file
+  // output : RDD[(String,String) ,Int] is an RDD representing the graph's edges and its weight
   def commonality(sc:SparkContext,songs:RDD[String],artistSimilarity:RDD[Array[String]],artistTerm:RDD[Array[String]]): RDD[((String, String), Int)] = {
 
     val artistTermLines = artistTerm.map(row => (row(0), row(1))).groupByKey().map { case (a, b) => (a, b.toSet) }
@@ -113,6 +126,7 @@ object Graph {
 
     val graphEdges2 = graphEdges1.map { case (a, b, c) => (b, a, c) }
 
+    // adding this to existing graph so that the undirected nature is maintained
     val graphEdgesUnion = graphEdges1 ++ graphEdges2
 
     return graphEdgesUnion.map{case(a,b,c) => ((a,b),c) }
