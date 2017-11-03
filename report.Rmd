@@ -8,15 +8,19 @@ output: html_document
 ## System Information
 
 The spark job with full data was run on:
+
 1.	AWS EC2 instance in local mode:
 >
- + Ec2-Instance type - m4.2x.large
- + vCPU: 4 RAM: 16GB Hard Disk: 50GB Storage: EBS-only
- + Processors for all the above machine was 64 bit 2.4 GHz Intel Xeon® E5-2676 v3 (Haswell) processors.
- + Each vCPU is a hyperthread of an Intel Xeon core
+  + Ec2-Instance type - m4.2x.large
+  + vCPU: 4 RAM: 16GB Hard Disk: 50GB Storage: EBS-only
+  + Processors for all the above machine was 64 bit 2.4 GHz Intel Xeon® E5-2676 v3 (Haswell) processors.
+  + Each vCPU is a hyperthread of an Intel Xeon core
    
    
-2.	
+2. Ubuntu VM on Windows 10 
+>
+  + VM-Ram GB ,Harddisk - 35GB
+  + Laptop -Ram - 8GB ,Hardisk 250 GB SSD
 
 ## System Design:
 
@@ -58,7 +62,7 @@ Repeated this process for 10 iterations.
   + Combined hotness: cluster songs into cool, mild, and hot based on two dimensions: artist hotness, and song hotness
   
 ## K-Means Clustering - Local Runs
-```{r echo=FALSE,message=FALSE}
+```{r echo=FALSE,message=FALSE,warning=FALSE}
 duration <- read.csv("outputForDuration/part-00000")
 colnames(duration) = c("SongId","Song_Length","Cluster")
 library(easyGgplot2)
@@ -66,37 +70,63 @@ ggplot2.stripchart(data=duration, main="K Means Cluster on Length of the", xName
                 xlab="Clusters 0 - Short, 1- Medium , 2 - Long",ylab="Song Length in Seconds",
                 colour="red")
 ```
+
 The graph above has 3 clusters on the x-axis and song duration on the y axis. The duration ranges from 0 to 3000. Cluster 0 is for short songs, Cluster 1 is for medium songs and Cluster 2 is for long songs. There are few songs with song duration greater than 1500.
 
 
-```{r echo=FALSE,message=FALSE}
+```{r echo=FALSE,message=FALSE,warning=FALSE}
 tempo <- read.csv("outputForTempo/part-00000")
 colnames(tempo) = c("SongId","Song_Tempo","Cluster")
 ggplot2.stripchart(data=tempo, main="K Means Cluster on Length of the", xName='Cluster',yName='Song_Tempo',groupName = 'Cluster')
 ```
+
 The graph above has 3 clusters on the x-axis and song tempo on the y axis. The tempo ranges from 0 to 300. Cluster 0 is for slow songs, Cluster 1 is for medium songs and Cluster 2 is for fast songs. The tempo of songs is densely populated from 50 to 250.
 
 
-```{r echo=FALSE,message=FALSE}
+```{r echo=FALSE,message=FALSE,warning=FALSE}
 loudness <- read.csv("outputForLoudness/part-00000")
 colnames(loudness) = c("SongId","Song_Loudness","Cluster")
 ggplot2.stripchart(data=loudness, main="K Means Cluster on Length of the", xName='Cluster',yName='Song_Loudness',groupName = 'Cluster')
 ```
+
 The graph above has 3 clusters on the x-axis and song loudness on the y axis. The loudness ranges from 5 to -60. Cluster 0 is for loud songs, Cluster 1 is for medium songs and Cluster 2 is for quiet songs. There are few songs with loudness less than -40 and they are densely populated from -40 to 0.
 
 
-```{r echo=FALSE,message=FALSE}
+```{r echo=FALSE,message=FALSE,warning=FALSE}
 hotness <- read.csv("outputForSonghotness/part-00000")
 colnames(hotness) = c("SongId","Song_Hotness","Cluster")
 ggplot2.stripchart(data=hotness, main="K Means Cluster on Length of the", xName='Cluster',yName='Song_Hotness',groupName = 'Cluster')
 ```
+
 The graph above has 3 clusters on the x-axis and song hotness on the y axis. The hotness ranges from 0 to 1. Cluster 0 is for cool songs, Cluster 1 is for mild songs and Cluster 2 is for hot songs. There are very few songs with hotness near 0 and they are densely populated from 0.25 to 1.
 
 ```{r echo=FALSE,message=FALSE}
 combinedhotness <- read.csv("outputForArtistHotnessAndSongHotness/part-00000", header=T, sep=",")
 qplot(Artist_Hotness, Song_Hotness, data=combinedhotness, col=Cluster)
 ```
+
 The graph above has Artist_Hotness on the x-axis and Song_Hotness on the y-axis. Both ranges are from 0 to 1. It is observed that most songs are mild songs and are produced by mild artists.
+
+## Performance
+```{r echo=FALSE,message=FALSE}
+
+queries = c("Loudness","Tempo","Duration","SongHotness","Combined")
+laptopTimes = c(194,182,181,221,369)
+ec2Times = c(132,132,130,151,266)
+height2 <- rbind(laptopTimes,ec2Times)
+
+mp2 <- barplot(height2,beside=TRUE,ylim=c(0,500), names.arg = queries,ylab="Execution time in seconds",xlab="Queries",main="Laptop vs Ec2 Instance for Kmeans on Full data",col = c("blue","red"))
+legend("top", 
+       legend = c("Laptop", "Ec2 Instance"), 
+       fill = c("blue", "red"))
+
+
+```
+
+The AWS run is actually not on a cluster you can think of it as a better laptop , because we ran it on local mode.As expected a machine with higher ram and more vcores performs slightly better.
+
+
+
 
 ## Challenges faced:
 
@@ -104,7 +134,13 @@ Realized (to a certain extent) when to use cartesian product. While doing agglom
 However, for KMedian as we had 30 centroids and less than 50,000 unique artists a cartesian product was producing a reasonable number of rows.
 Accessing successive row while keeping the whole thing parallel. We had to create a whole new shifted rdd index it and perform a join just to access the next row in an rdd. 
 
+However the K-Means Clustering on Graph was only successful on the smaller dataset and and not on the large dataset
+
 ## Conclusion
 
 Although algorithms like KMean and Agglomerative are written in a couple of lines of code, it takes hours to come up with the logic behind it. Had to dig deep into scala and spark syntax to obtain transformations like zipWithIndex. Realised the expense of joins and cartesian product and when to use them. Regarding the data set we concluded that there are very few songs with hotness near 0 and they are densely populated from 0.25 to 1. There are few songs with loudness less than -40 and they are densely populated from -40 to 0. There are few songs with song length greater than 1500. The tempo of songs is densely populated from 50 to 250.
+
+Another interesting thing we found out about kmeans which is not backed up here is that ,the way the points cluster around a centroid depends on the initial centroids. And we thought that 10 iterations are sufficient as the delta of centroids after that was less,but I guess if we run the Kmeans long enough it will converge properly even if the initial centroids are far away from the final one.
+
+
 
