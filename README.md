@@ -13,13 +13,18 @@
 * SPARK_HOME
 * SONG_INFO
 * ARTIST_TERMS
-* OUTPUT_DIR
+* SIMILAR_ARTISTS
+* SONG_INFO_GRAPH
+* ARTIST_TERMS_GRAPH
+* SIMILAR_ARTISTS_GRAPH
 ### Sample values are below
 ***
 * SPARK_HOME = /home/ubuntu/spark-2.2.0-bin-hadoop2.7
 * SONG_INFO = /home/ubuntu/all/song_info.csv
 * ARTIST_TERMS = /home/ubuntu/all/artist_terms.csv
 * OUTPUT_DIR = output
+
+### The graph program runs only on subset dataset
 
 #### substitute $SPARK_HOME appropriately as per your system
 
