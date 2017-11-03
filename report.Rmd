@@ -1,0 +1,32 @@
+---
+title: "A7 - Clustering"
+author: "Aditya, Vineet"
+date: "November 3, 2017"
+output: html_document
+---
+
+ 
+## Subproblem 1: Clustering
+## Using Spark, perform hierarchical agglomerative clustering and k-means clustering as follows:
+>
+  + Fuzzy loudness: cluster songs into quiet, medium, and loud
+  + Fuzzy length: cluster songs into short, medium, and long
+  + Fuzzy tempo: cluster songs into slow, medium, and fast
+  + Fuzzy hotness: cluster songs into cool, mild, and hot based on song hotness
+  + Combined hotness: cluster songs into cool, mild, and hot based on two dimensions: artist hotness, and song hotness
+  
+## K-Means Clustering - Local Runs
+```{r echo=FALSE,message=FALSE}
+duration <- read.csv("outputForDuration/part-00000")
+colnames(duration) = c("SongId","Song_Length","Cluster")
+library(easyGgplot2)
+ggplot2.stripchart(data=duration, main="K Means Cluster on Length of the", xName='Cluster',yName='Song_Length',groupName = 'Cluster',
+                xlab="Clusters 0 - Short, 1- Medium , 2 - Long",ylab="Song Length in Seconds",
+                colour="red")
+```
+
+```{r echo=FALSE,message=FALSE}
+tempo <- read.csv("outputFortempo/part-00000")
+colnames(tempo) = c("SongId","Song_Tempo","Cluster")
+ggplot2.stripchart(data=tempo, main="K Means Cluster on Length of the", xName='Cluster',yName='Song_Tempo',groupName = 'Cluster')
+
