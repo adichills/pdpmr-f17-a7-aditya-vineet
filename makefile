@@ -3,6 +3,10 @@ CLASSPATH=`echo $(SPARK_HOME)/jars/*.jar | tr ' ' :`
 SONG_INFO = /home/aditya/songs/subset/song_info.csv
 ARTIST_TERMS = /home/aditya/songs/subset/artist_terms.csv
 SIMILAR_ARTISTS = /home/aditya/songs/subset/similar_artists.csv
+
+SONG_INFO_GRAPH = /home/aditya/songs/subset/song_info.csv
+ARTIST_TERMS_GRAPH = /home/aditya/songs/subset/artist_terms.csv
+SIMILAR_ARTISTS_GRAPH = /home/aditya/songs/subset/similar_artists.csv
 OUTPUT_DIR = output
 ITERATION = 10
 all: build run
@@ -20,12 +24,8 @@ run:
         --master local --deploy-mode client --executor-memory 2g \
         --name KmeansClustering --conf "spark.app.id=KmeansClustering" \
         KmeansClustering.jar $(SONG_INFO) $(ARTIST_TERMS) $(SIMILAR_ARTISTS) $(ITERATION)
-	$(SPARK_HOME)/bin/spark-submit --class AgglomerativeClustering \
-        --master local --deploy-mode client --executor-memory 2g \
-        --name Agglomerative --conf "spark.app.id=Agglomerative" \
-        Agglomerative.jar $(SONG_INFO) $(ARTIST_TERMS) $(SIMILAR_ARTISTS) $(ITERATION)
 	$(SPARK_HOME)/bin/spark-submit --class Graph \
         --master local --deploy-mode client --executor-memory 2g \
         --name Graph --conf "spark.app.id=Graph" \
-        Graph.jar $(SONG_INFO) $(ARTIST_TERMS) $(SIMILAR_ARTISTS) $(ITERATION)
+        Graph.jar $(SONG_INFO_GRAPH) $(ARTIST_TERMS_GRAPH) $(SIMILAR_ARTISTS_GRAPH) $(ITERATION)
 
