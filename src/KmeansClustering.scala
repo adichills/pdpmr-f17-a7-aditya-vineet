@@ -1,14 +1,12 @@
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.util.DoubleAccumulator
 import org.apache.spark.{SparkConf, SparkContext}
 
-import scala.collection.mutable.ListBuffer
 import scala.util.control.Exception.allCatch
 
 
 /*
-	Author : Aditya Kammardi Sathyanarayan, Vineet Trivedi
+	Author : Aditya Kammardi Sathyanarayan,Vineet
 
 */
 
@@ -20,7 +18,29 @@ object KmeansClustering {
   */
   def isDoubleNumber(s: String): Boolean = (allCatch opt s.toDouble).isDefined
 
-  def getMinimumIndex(centroids: Array[Double], metric: Double): Int = {
+  def getMinimumIndexEucledian(centroids: Array[(Double, Double)], metric: (Double, Double)): Int = {
+    var min: Double = 10000000.0
+    var minIndex: Int = 0
+    for (i <- 0 to 2) {
+      var diff = computeEuclideanDistance(centroids(i), metric)
+      if (diff < min) {
+        min = diff
+        minIndex = i
+      }
+    }
+
+    return minIndex
+  }
+
+  // This method takes in two 2D points and computes the euclidien distance between them
+  def computeEuclideanDistance(point1: (Double, Double), point2: (Double, Double)): Double = {
+    var result: Double = 0
+    result = Math.sqrt(Math.pow(point1._1 - point2._1, 2) + Math.pow(point1._2 - point2._2, 2))
+    return result
+  }
+
+  // This methods takes the 1D centroids and a 1D metric and returns the index of the centroid the metric is closest to
+  def getMinimumIndex1D(centroids: Array[Double], metric: Double): Int = {
     var min: Double = 100000000.0
     var minIndex: Int = 0
     for (i <- 0 to 2) {
@@ -35,7 +55,10 @@ object KmeansClustering {
   }
 
 
-  def updateCentroid(frame: RDD[(String, Double, Int)], c: Array[Double]): Array[Double] = {
+  // This method calculates a new 1D centroid from the input Frame of RDD[(String,Double,Int)]
+  // Algo - Group all the songs by the centroid index they belong to and sum all the values in the cluster and find the average
+  // the average is the new centroid point for that cluser
+  def updateCentroid1D(frame: RDD[(String, Double, Int)], c: Array[Double]): Array[Double] = {
 
     val groupByCluser = frame
       .map(row => (row._3, row._2))
@@ -49,34 +72,93 @@ object KmeansClustering {
       c(i) = cnt(i)._2
     }
 
-
     return c
   }
 
+  // Works the same way as the above method ,but works on 2D data. The only problem is this is kind of inefficient ,as the
+  // same computation is done twice once for the x co-ordinate and once for the y co-ordinate
+  def updateCentroidEucledian(frame: RDD[(String, Double, Double, Int)], centroid: Array[(Double, Double)]): Array[(Double, Double)] = {
+    val group1ByCluster = frame.map(row => (row._4, row._2))
+      .mapValues(x => (x, 1))
+      .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2))
+      .mapValues(y => 1.0 * y._1 / y._2)
+      .sortByKey()
 
-  def assignCentroids(frame: RDD[(String, Double, Int)], centroids: Array[Double]): RDD[(String, Double, Int)] = {
-    println("In Assign Centroids")
-    frame.map(row => (row._1, row._2, getMinimumIndex(centroids, row._2))).persist()
-    //return f
+    // {(0 , value1) ,(1,value 2),(2,value 3)}
+    var cnt1 = group1ByCluster.take(3)
+
+
+    val group2ByCluser = frame.map(row => (row._4, row._3))
+      .mapValues(x => (x, 1))
+      .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2))
+      .mapValues(y => 1.0 * y._1 / y._2)
+      .sortByKey()
+
+    // {(0 , value1) ,(1,value 2),(2,value 3)}
+    var cnt2 = group2ByCluser.take(3)
+
+
+    var newCentroids: Array[(Double, Double)] = Array((cnt1(0)._2, cnt2(0)._2), (cnt1(1)._2, cnt2(1)._2), (cnt1(2)._2, cnt2(2)._2))
+    return newCentroids
   }
 
 
-  def kmeans(frame: RDD[(String, Double, Int)], centroids: Array[Double]): RDD[(String, Double, Int)] = {
+  //This method assigns a new centroid to each song based on how close its metric is to the current 3 centroids
+  def assignCentroids1D(frame: RDD[(String, Double, Int)], centroids: Array[Double]): RDD[(String, Double, Int)] = {
+    println("In Assign Centroids")
+    frame.map(row => (row._1, row._2, getMinimumIndex1D(centroids, row._2))).persist()
+
+  }
+
+  //This method assigns a new centroid to each song based on how close its metric is to the current 3 centroids in 2D
+  def assignCentroids2D(frame: RDD[(String, Double, Double, Int)], centroids: Array[(Double, Double)]): RDD[(String, Double, Double, Int)] = {
+    println("In Assign Centroids")
+    frame.map(row => (row._1, row._2, row._3, getMinimumIndexEucledian(centroids, (row._2, row._3)))).persist()
+  }
+
+
+  //Performs K means for specified number of iterations on 1D data points
+  // input - RDD consisting of SongId ,Metric ,CentroidIndex (initialized to -1),
+  //          - Centroids (Randomly initialized)
+  //          - iterations
+  def kmeans1D(frame: RDD[(String, Double, Int)], centroids: Array[Double], iterations: Int): RDD[(String, Double, Int)] = {
     var f: RDD[(String, Double, Int)] = frame
     var c = centroids
     println("Calling kmeans")
 
 
-    for (i <- 1 to 10) {
-      f = assignCentroids(f, c)
+    for (i <- 1 to iterations) {
+      f = assignCentroids1D(f, c)
 
-      c = updateCentroid(f, c)
+      c = updateCentroid1D(f, c)
       for (j <- 0 to 2) {
         println(centroids(j))
       }
 
 
     }
+    return f
+  }
+
+  // Performs K means for specified number of iterations on 2D data points
+  // input - RDD consisting of SongId ,Metric-x,Metric-y ,CentroidIndex (initialized to -1),
+  //          - Centroids (Randomly initialized)
+  //          - iterations
+  def kmeans2D(frame: RDD[(String, Double, Double, Int)], centroids: Array[(Double, Double)], iterations: Int): RDD[(String, Double, Double, Int)] = {
+    var f: RDD[(String, Double, Double, Int)] = frame
+    var c = centroids
+    println("Calling Kmeans")
+
+    for (i <- 1 to iterations) {
+      f = assignCentroids2D(f, c)
+
+      c = updateCentroidEucledian(f, c)
+
+      for (j <- 0 to 2) {
+        println(c(j))
+      }
+    }
+
     return f
   }
 
@@ -87,18 +169,14 @@ object KmeansClustering {
       Initialize spark context
 
     */
+
+    val comma = ","
+
+    //Turn of the logger
     Logger.getLogger("org").setLevel(Level.OFF)
     Logger.getLogger("akka").setLevel(Level.OFF)
     val conf = new SparkConf().setAppName("KmeansClustering")
     val sc = new SparkContext(conf)
-
-    /*
-      List buffer to hold the output data
-    */
-    var output = new ListBuffer[String]()
-
-    val t1 = System.currentTimeMillis()
-
     /*
       Load the contents song file into a val
     */
@@ -112,112 +190,110 @@ object KmeansClustering {
     lines.persist()
 
 
+    val t1 = System.currentTimeMillis()
+
+
     /*
-      check for corrupt numbers in loudness field and filter them out
-      pick up songId , song title and loudness from each row
-      sortBy loudness and pick top 5
-    */
-    val flines = lines.filter(row => isDoubleNumber(row(6)))
-    val loudnessValues = flines.map(row => (row(23), row(6).toDouble, -1))
+      Important Assumption - We are considering the SongId field as the unique identifier of the songs as instead of trackid
+
+     */
+
+    /*
+     check for corrupt numbers in loudness field and filter them out
+     pick up songId , and loudness from each row
+
+     assign each row 's cluster index as -1 initially
+
+     Pick random centroids
+
+     Call K-Means on the songId - Loudness values
+   */
+    val filteredLines1 = lines.filter(row => isDoubleNumber(row(6)))
+    val loudnessValues = filteredLines1.map(row => (row(23), row(6).toDouble, -1))
     var centroids: Array[Double] = Array(0.0, -10.0, -30.0)
-    var f1 = kmeans(loudnessValues, centroids)
+    var f1 = kmeans1D(loudnessValues, centroids, args(3).toInt)
+    f1.map(row => row._1 + comma + row._2 + comma + row._3).repartition(1).saveAsTextFile("outputForLoudness")
 
-    val t2 = System.currentTimeMillis();
+    val t2 = System.currentTimeMillis()
 
-    println((t2 - t1) / 1000)
+    /*
+    check for corrupt numbers in tempo field and filter them out
+    pick up songId , and loudness from each row
 
+    assign each row 's cluster index as -1 initially
 
-    val flines2 = lines.filter(row => isDoubleNumber(row(7)))
-    val temp = flines2.map(row => (row(23), row(7).toDouble, -1))
+    Pick random centroids
+
+    Call K-Means on the songId - Tempo values
+  */
+    val filteredLines2 = lines.filter(row => isDoubleNumber(row(7)))
+    val tempo = filteredLines2.map(row => (row(23), row(7).toDouble, -1))
     centroids = Array(0.0, 100.0, 200.0)
-    var f2 = kmeans(temp, centroids)
-    f2.saveAsTextFile("outputForTempo")
+    var f2 = kmeans1D(tempo, centroids, args(3).toInt)
+    f2.map(row => row._1 + comma + row._2 + comma + row._3).repartition(1).saveAsTextFile("outputForTempo")
 
-    val flines3 = lines.filter(row => isDoubleNumber(row(5)))
-    val duration = flines3.map(row => (row(23), row(5).toDouble, -1))
-    centroids = Array(0.0, 100.0, 200.0)
-    var f3 = kmeans(duration, centroids)
-    f3.saveAsTextFile("outputForDuration")
+    val t3 = System.currentTimeMillis()
 
-    val flines4 = lines.filter(row => isDoubleNumber(row(25)))
-    val songhotness = flines4.map(row => (row(23), row(25).toDouble, -1))
+
+    /*
+    check for corrupt numbers in duration field and filter them out
+    pick up songId , and duration from each row
+
+    assign each row 's cluster index as -1 initially
+
+    Pick random centroids
+
+    Call K-Means on the songId - duration values
+  */
+
+    val filteredLines3 = lines.filter(row => isDoubleNumber(row(5)))
+    val duration = filteredLines3.map(row => (row(23), row(5).toDouble, -1))
+    centroids = Array(0.0, 1000.0, 1500.0)
+    var f3 = kmeans1D(duration, centroids, args(3).toInt)
+    f3.map(row => row._1 + comma + row._2 + comma + row._3).repartition(1).saveAsTextFile("outputForDuration")
+
+    val t4 = System.currentTimeMillis()
+
+    /*
+    check for corrupt numbers in song hotness field and filter them out
+    pick up songId , and Song hotness from each row
+
+    assign each row 's cluster index as -1 initially
+
+    Pick random centroids
+
+    Call K-Means on the songId - songhotness values values
+  */
+    val filteredLines4 = lines.filter(row => isDoubleNumber(row(25)))
+    val songhotness = filteredLines4.map(row => (row(23), row(25).toDouble, -1))
     centroids = Array(0.0, 0.3, 0.7)
-    var f4 = kmeans(songhotness, centroids)
-    f4.saveAsTextFile("outputForSonghotness")
+    var f4 = kmeans1D(songhotness, centroids, args(3).toInt)
+    f4.map(row => row._1 + comma + row._2 + comma + row._3).repartition(1).saveAsTextFile("outputForSonghotness")
 
+    val t5 = System.currentTimeMillis()
 
-  }
+    /*
+    check for corrupt numbers in artist hotness fields and song hotness field and filter them out
+    pick up songId ,artisthotness and Song hotness from each row
 
-  def test(args: RDD[(String, (String, Iterable[String]))]) = {
+    assign each row 's cluster index as -1 initially
 
-  }
+    Pick random centroids
 
-  def commanlity(artFile: String, simArtFile: String, songFile: String, sc: SparkContext) = {
-    val artistTermsRDD = sc.textFile(artFile)
-    val simArtFileRDD = sc.textFile(simArtFile)
+    Call K-Means on the songId - songhotness values values
+  */
+    val filteredLines5 = lines.filter(row => isDoubleNumber(row(20)) && isDoubleNumber(row(25)))
+    val songsByArtistHotnessAndSongHotness = filteredLines5.map(row => (row(23), row(20).toDouble, row(25).toDouble, -1))
+    var centroids2d = Array((0.0, 0.0), (0.3, 0.3), (0.7, 0.7))
+    var f5 = kmeans2D(songsByArtistHotnessAndSongHotness, centroids2d, args(3).toInt)
+    f5.map(row => row._1 + comma + row._2 + comma + row._3 + comma + row._4).repartition(1).saveAsTextFile("outputForArtistHotnessAndSongHotness")
 
-    val header1 = artistTermsRDD.first()
-    val header2 = simArtFileRDD.first()
-
-    val artistTermLines = artistTermsRDD.filter(row => row != header1).map(row => row.split(";")).map(row => (row(0), row(1))).groupByKey().map { case (a, b) => (a, b.toSet) }
-    artistTermLines.persist()
-
-    val songsFile = sc.textFile(songsFile)
-    val songsHeader = songsFile.first()
-    val songLines = songsFile.filter(row => row != songsHeader)
-    val songs = songLines.map(rec => rec.split(";"))
-    songs.persist()
-
-
-    val similarArtLines = simArtFileRDD.filter(row => row != header2).map(row => row.split(";")).map(row => (row(0), row(1))).distinct()
-    similarArtLines.persist()
-
-    val artistsByFamiliarity = songs.filter(row => isDoubleNumber(row(19)))
-      .map(rec => (rec(16), rec(19).toDouble))
-    val meanArtistFamiliarity = artistsByFamiliarity.mapValues(x => (x, 1))
-      .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2))
-      .mapValues(y => 1.0 * y._1 / y._2)
-
-    val artistSongs = songs.map(x => (x(16), 1)).groupByKey().map(x => (x._1, x._2.size))
-
-    val similarArtists = similarArtLines.groupByKey().map(x => (x._1, x._2.size))
-
-
-    val joinedSimArtistTerms = similarArtLines.join(artistTermLines)
-
-    val temp = joinedSimArtistTerms.map { case (a, (b, c)) => (b, (a, c)) }.join(artistTermLines)
-
-    val graphEdges1 = temp.map { case (a, ((b, c), d)) => (a, b, c.intersect(d).size) }
-
-
-    val graphEdges2 = graphEdges1.map { case (a, b, c) => (b, a, c) }
-
-    val graphEdgesUnion = graphEdges1 ++ graphEdges2
-
-
-  }
-
-
-  def trendSetters(sc: SparkContext, songs: RDD[Array[String]], artistSimilarity: RDD[Array[String]], artistTerms: RDD[Array[String]])
-  : RDD[(String, Double)] = {
-
-    val artistsByFamiliarity = songs.filter(row => isDoubleNumber(row(19)))
-      .map(rec => (rec(16), rec(19).toDouble))
-    val meanArtistFamiliarity = artistsByFamiliarity.mapValues(x => (x, 1))
-      .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2))
-      .mapValues(y => 1.0 * y._1 / y._2)
-
-    val artistSongs = songs.map(x => (x(16), 1)).groupByKey().map(x => (x._1, x._2.size))
-
-    val similarArtists = artistSimilarity.map(x => (x(0), x(1))).groupByKey().map(x => (x._1, x._2.size))
-
-
-    val popularity = artistSongs.join(similarArtists)
-      .map(x => (x._1, (x._2._1) * (x._2._2)))
-      .join(meanArtistFamiliarity)
-      .map(x => (x._1, x._2._2 * x._2._1))
-      .sortBy(_._2, false)
-    return popularity
+    val t6 = System.currentTimeMillis()
+    println(("Loudness Query Executed in " + (t2 - t1) / 1000) + " seconds")
+    println(("Tempo Query Executed in " + (t3 - t2) / 1000) + " seconds")
+    println(("Duration Query Executed in " + (t4 - t3) / 1000) + " seconds")
+    println(("Songhotness Query Executed in " + (t5 - t4) / 1000) + " seconds")
+    println(("ArtistHotness and SongHotness Query Executed in " + (t6 - t5) / 1000) + " seconds")
 
   }
 

@@ -41,14 +41,57 @@ object Graph {
 
     popularArtistsDescRDD.take(30).foreach(x => println(x._1 + " " + x._2))
 
-
-
-
+    val graph = commonality(sc,songs,artistSimilarity,artistTerm)
+    var table2 = sc.parallelize(popularArtistsDescRDD.take(30)).map(x => x._1)
+    val table1 = popularArtistsDescRDD.map(x => x._1)
+    
+    for(i <- 1 to 10){
+     // var newCentroids = kMedian(i,sc,table1,table2,graph)
+     // table2 = newCentroids
+     
+     val start = table1.cartesian(table2).map(x => (x,1))
+     val intermediate = start.join(graph)
+                             .map{case ((a,b),(c,d)) => (a,(b,d)) }
+                             .reduceByKey( (x,y) => if(x._2 > y._2) x else y )
+                             .map{case (a,(b,c)) => (b,(a,c))}
+                             .groupByKey()
+                            
+     if(i == 10) {
+       intermediate.saveAsTextFile("GraphClusters")
+     }
+    
+     val newCentroid = intermediate.map{case (a,b) => (a,b.toList)}
+                                   .map{case (a,b) => (a,b.sortBy(_._2))}
+                                   .map{case(a,b) => (b(b.size/2))}
+                                   .map(x => x._1)
+     
+     table2 = newCentroid
+                                  
+    }
 
 
   }
+  
+//  def kMedian(i:Int, sc:SparkContext, table1:RDD[String], table2:RDD[String], table3:RDD[(String,String,Double)]) = {
+//    val start = table1.cartesian(table2).map(x => (x,1))
+//    val intermediate = start.join(table3)
+//                            .map{case ((a,b),(c,d)) => (a,(b,d)) }
+//                            .reduceByKey( (x,y) => if(x._2 > y._2) x else y )
+//                            .map{case (a,(b,c)) => (b,(a,c))}
+//                            .groupByKey()
+//                            
+//    if(i == 10) {
+//      intermediate.saveAsTextFile("GraphClusters")
+//    }
+//    
+//    val newCentroid = intermediate.map{case (a,b) => (a,b.toList)}
+//                                  .map{case (a,b) => (a,b.sortBy(_._2))}
+//                                  .map{case(a,b) => (b(b.size/2))}
+//                        
+//    return newCentroid
+//  }
 
-  def commanlity(sc:SparkContext,songs:RDD[Array[String]],artistSimilarity:RDD[Array[String]],artistTerm:RDD[Array[String]]) = {
+  def commonality(sc:SparkContext,songs:RDD[String],artistSimilarity:RDD[Array[String]],artistTerm:RDD[Array[String]]): RDD[((String, String), Int)] = {
 
     val artistTermLines = artistTerm.map(row => (row(0), row(1))).groupByKey().map { case (a, b) => (a, b.toSet) }
     artistTermLines.persist()
@@ -74,9 +117,7 @@ object Graph {
 
     val graphEdgesUnion = graphEdges1 ++ graphEdges2
 
-
-
-
+    return graphEdgesUnion.map{case(a,b,c) => ((a,b),c) }
   }
 
   def artistsByPopularity(sc:SparkContext,lines:RDD[Array[String]],artistSimilarity:RDD[Array[String]],artistTerm:RDD[Array[String]]): RDD[(String, Double)] ={
