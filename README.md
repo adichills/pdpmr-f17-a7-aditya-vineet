@@ -40,3 +40,5 @@
 * library(devtools)
 * install_github("easyGgplot2","kassambara")
 
+#### It takes really long to run the report say 10 mins to load all the data in R, so the run command for report is not given in the make file
+
