@@ -4,6 +4,12 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.util.control.Exception.allCatch
 
+
+/*
+
+    Author : Aditya and Vineet
+ */
+
 object Graph {
 
   def isDoubleNumber(s: String): Boolean = (allCatch opt s.toDouble).isDefined
@@ -19,78 +25,80 @@ object Graph {
     val artistTermsRDD = sc.textFile(args(1))
     val simArtFileRDD = sc.textFile(args(2))
 
-
+    // Process lines from songs_info.csv
     val songFileHeader = songFileRDD.first()
     val songs = songFileRDD.filter(row => row != songFileHeader)
     val lines = songs.map(rec => rec.split(";"))
     lines.persist()
 
 
-
+    // process lines from similar artists
     val similarArtistsHeader = simArtFileRDD.first()
     val similarArtistsLines = simArtFileRDD.filter(row => row!=similarArtistsHeader)
-    val artistSimilarity = similarArtistsLines.map(rec => rec.split(";")).distinct()
+    val artistSimilarity = similarArtistsLines.map(rec => rec.split(";"))
     artistSimilarity.persist()
 
+    // process lines from artistTermsheader
     val artistTermHeader = artistTermsRDD.first()
     val artistTermLines = artistTermsRDD.filter(row => row!=artistTermHeader)
     val artistTerm = artistTermLines.map(rec => rec.split(";"))
     artistTerm.persist()
 
+
+    val t1 = System.currentTimeMillis()
+    // compute artist popularity
+
     val popularArtistsDescRDD = artistsByPopularity(sc,lines,artistSimilarity,artistTerm)
 
     popularArtistsDescRDD.take(30).foreach(x => println(x._1 + " " + x._2))
+    val t2 = System.currentTimeMillis()
 
+
+    // compute the commanlity graph
     val graph = commonality(sc,songs,artistSimilarity,artistTerm)
     var table2 = sc.parallelize(popularArtistsDescRDD.take(30)).map(x => x._1)
     val table1 = popularArtistsDescRDD.map(x => x._1)
-    
+    val t3 =  System.currentTimeMillis()
     for(i <- 1 to 10){
-     // var newCentroids = kMedian(i,sc,table1,table2,graph)
-     // table2 = newCentroids
-     
+     // this is an expensive step (Need to do better than this)
      val start = table1.cartesian(table2).map(x => (x,1))
      val intermediate = start.join(graph)
                              .map{case ((a,b),(c,d)) => (a,(b,d)) }
                              .reduceByKey( (x,y) => if(x._2 > y._2) x else y )
                              .map{case (a,(b,c)) => (b,(a,c))}
                              .groupByKey()
-                            
+
      if(i == 10) {
-       intermediate.saveAsTextFile("GraphClusters")
+       intermediate.repartition(1).saveAsTextFile("GraphClusters")
      }
-    
+
      val newCentroid = intermediate.map{case (a,b) => (a,b.toList)}
                                    .map{case (a,b) => (a,b.sortBy(_._2))}
                                    .map{case(a,b) => (b(b.size/2))}
                                    .map(x => x._1)
-     
+
      table2 = newCentroid
                                   
     }
 
+    val t4 = System.currentTimeMillis()
+
+    println(("Popularity Executed in " + (t2 - t1) / 1000) + " seconds")
+    println(("Commanality graph Executed in " + (t3 - t2) / 1000) + " seconds")
+    println(("K Means Clustering " + (t4 - t3) / 1000) + " seconds")
+
 
   }
   
-//  def kMedian(i:Int, sc:SparkContext, table1:RDD[String], table2:RDD[String], table3:RDD[(String,String,Double)]) = {
-//    val start = table1.cartesian(table2).map(x => (x,1))
-//    val intermediate = start.join(table3)
-//                            .map{case ((a,b),(c,d)) => (a,(b,d)) }
-//                            .reduceByKey( (x,y) => if(x._2 > y._2) x else y )
-//                            .map{case (a,(b,c)) => (b,(a,c))}
-//                            .groupByKey()
-//                            
-//    if(i == 10) {
-//      intermediate.saveAsTextFile("GraphClusters")
-//    }
-//    
-//    val newCentroid = intermediate.map{case (a,b) => (a,b.toList)}
-//                                  .map{case (a,b) => (a,b.sortBy(_._2))}
-//                                  .map{case(a,b) => (b(b.size/2))}
-//                        
-//    return newCentroid
-//  }
 
+
+  // This method generates the Commonailty graph edges
+  // This method computes the artists popularity
+  // Input : lines:RDD[Array[String]] lines from the song_info.csv without the header
+  //
+  //        artitstSimilarity:RDD[Array[String]] lines from the artist_similarity.csv without the header
+  //        artistTerm :RDD[Array[String]] lines from the artistt terms file
+  // output : RDD[(String,String) ,Int] is an RDD representing the graph's edges and its weight
   def commonality(sc:SparkContext,songs:RDD[String],artistSimilarity:RDD[Array[String]],artistTerm:RDD[Array[String]]): RDD[((String, String), Int)] = {
 
     val artistTermLines = artistTerm.map(row => (row(0), row(1))).groupByKey().map { case (a, b) => (a, b.toSet) }
@@ -105,7 +113,10 @@ object Graph {
 
     val similarArtists = similarArtLines.groupByKey().map(x => (x._1, x._2.size))
 
-
+    // join similarArtists with artist terms
+    // SimilarArtist(A1,A2) with ArtistTerm(A1,Terms) = >  Join(A1,(A2, Terms for A1))
+    // Then flip the the keys A2 and A1 and join on artist terms again and perform an intersection of the terms for both artists
+    //
     val joinedSimArtistTerms = similarArtLines.join(artistTermLines)
 
     val temp = joinedSimArtistTerms.map { case (a, (b, c)) => (b, (a, c)) }.join(artistTermLines)
@@ -115,16 +126,24 @@ object Graph {
 
     val graphEdges2 = graphEdges1.map { case (a, b, c) => (b, a, c) }
 
+    // adding this to existing graph so that the undirected nature is maintained
     val graphEdgesUnion = graphEdges1 ++ graphEdges2
 
     return graphEdgesUnion.map{case(a,b,c) => ((a,b),c) }
   }
 
+  // This method computes the artists popularity
+  // Input : lines:RDD[Array[String]] lines from the song_info.csv without the header
+  //
+  //        artitstSimilarity:RDD[Array[String]] lines from the artist_similarity.csv without the header
+  //        artistTerm :RDD[Array[String]] lines from the artistt terms file
+  // Output : RDD[String,Double] which is popularity for each artist
   def artistsByPopularity(sc:SparkContext,lines:RDD[Array[String]],artistSimilarity:RDD[Array[String]],artistTerm:RDD[Array[String]]): RDD[(String, Double)] ={
 
-
+    // check for sanity of artistFamiliarity
     val artistsByFamiliarity = lines.filter(row => isDoubleNumber(row(19)))
       .map(rec => (rec(16),rec(19).toDouble))
+    // reason we take mean is because there are many a
     val meanArtistFamiliarity = artistsByFamiliarity.mapValues(x => (x, 1))
       .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2))
       .mapValues(y => 1.0 * y._1 / y._2)

@@ -5,6 +5,12 @@ import org.apache.spark.{SparkConf, SparkContext}
 import scala.collection.mutable.ListBuffer
 import scala.util.control.Exception.allCatch
 
+
+/*
+    Author : Vineet , Aditya
+
+ */
+
 object AgglomerativeClustering {
   def isDoubleNumber(s: String): Boolean = (allCatch opt s.toDouble).isDefined
 
@@ -14,12 +20,10 @@ object AgglomerativeClustering {
 
     Logger.getLogger("org").setLevel(Level.OFF)
     Logger.getLogger("akka").setLevel(Level.OFF)
-    val conf = new SparkConf().setAppName("KmeansClustering")
+    val conf = new SparkConf().setAppName("AgglomerativeClustering")
     val sc = new SparkContext(conf)
 
-    /*
-      List buffer to hold the output data
-    */
+
     var output = new ListBuffer[String]()
 
     val t1 = System.currentTimeMillis()
@@ -77,23 +81,23 @@ object AgglomerativeClustering {
       val temp = agglomerative(sc,lengthCluster)
       lengthCluster = temp
     }
-    val zippedCluster = lengthCluster.zipWithIndex.map{case (k,v) => (v,k)}
+    val zippedCluster2 = lengthCluster.zipWithIndex.map{case (k,v) => (v,k)}
     
-    val lengthCluster1 = zippedCluster.filter(x => x._1==0)
+    val lengthCluster1 = zippedCluster2.filter(x => x._1==0)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
                                 .join(lengthClusterCopy)
                                 .map{case(a,(b,c)) => (a,c)}
                                 
-    val lengthCluster2 = zippedCluster.filter(x => x._1==1)
+    val lengthCluster2 = zippedCluster2.filter(x => x._1==1)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
                                 .join(lengthClusterCopy)
                                 .map{case(a,(b,c)) => (a,c)}
     
-    val lengthCluster3 = zippedCluster.filter(x => x._1==2)
+    val lengthCluster3 = zippedCluster2.filter(x => x._1==2)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
@@ -113,23 +117,23 @@ object AgglomerativeClustering {
       val temp = agglomerative(sc,tempoCluster)
       tempoCluster = temp
     }
-    val zippedCluster = tempoCluster.zipWithIndex.map{case (k,v) => (v,k)}
+    val zippedCluster3 = tempoCluster.zipWithIndex.map{case (k,v) => (v,k)}
     
-    val tempoCluster1 = zippedCluster.filter(x => x._1==0)
+    val tempoCluster1 = zippedCluster3.filter(x => x._1==0)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
                                 .join(tempoClusterCopy)
                                 .map{case(a,(b,c)) => (a,c)}
                                 
-    val tempoCluster2 = zippedCluster.filter(x => x._1==1)
+    val tempoCluster2 = zippedCluster3.filter(x => x._1==1)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
                                 .join(tempoClusterCopy)
                                 .map{case(a,(b,c)) => (a,c)}
     
-    val tempoCluster3 = zippedCluster.filter(x => x._1==2)
+    val tempoCluster3 = zippedCluster3.filter(x => x._1==2)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
@@ -149,23 +153,23 @@ object AgglomerativeClustering {
       val temp = agglomerative(sc,hotnessCluster)
       hotnessCluster = temp
     }
-    val zippedCluster = hotnessCluster.zipWithIndex.map{case (k,v) => (v,k)}
+    val zippedCluster4 = hotnessCluster.zipWithIndex.map{case (k,v) => (v,k)}
     
-    val hotnessCluster1 = zippedCluster.filter(x => x._1==0)
+    val hotnessCluster1 = zippedCluster4.filter(x => x._1==0)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
                                 .join(hotnessClusterCopy)
                                 .map{case(a,(b,c)) => (a,c)}
                                 
-    val hotnessCluster2 = zippedCluster.filter(x => x._1==1)
+    val hotnessCluster2 = zippedCluster4.filter(x => x._1==1)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
                                 .join(hotnessClusterCopy)
                                 .map{case(a,(b,c)) => (a,c)}
     
-    val hotnessCluster3 = zippedCluster.filter(x => x._1==2)
+    val hotnessCluster3 = zippedCluster4.filter(x => x._1==2)
                                 .map{case(x,y) => (y)}
                                 .flatMap(x => x._1.split(","))
                                 .map(x => (x,1))
