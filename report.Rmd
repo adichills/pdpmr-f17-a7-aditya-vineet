@@ -120,6 +120,16 @@ legend("top",
        legend = c("Laptop", "Ec2 Instance"), 
        fill = c("blue", "red"))
 
+queries2 = c("KMeans_on_Graph")
+laptopTimes2 = c(688)
+ec2Times2 = c(389)
+height3 <- rbind(laptopTimes2,ec2Times2)
+
+mp3 <- barplot(height3,beside=TRUE,ylim=c(0,900), names.arg = queries2,ylab="Execution time in seconds",xlab="Queries",main="Laptop vs Ec2 Instance for Kmedian graph on subset data",col = c("blue","red"))
+legend("top", 
+       legend = c("Laptop", "Ec2 Instance"), 
+       fill = c("blue", "red"))
+
 
 ```
 
