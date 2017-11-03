@@ -41,22 +41,22 @@ object Clustering {
     return minIndex
   }
 
-  def updateCentroids(frame:RDD[(String,String,Double,Int)],c:Array[Double]):Array[Double] ={
+  def updateCentroid(frame:RDD[(String,Double,Int)],c:Array[Double]):Array[Double] ={
 
-    val reduced = frame.map(row=>(row._3,row._4))
+    val reduced = frame.map(row=>(row._2,row._3))
     val quiet = reduced.filter(row => row._2 == 0).map(row=>row._1)
     val medium = reduced.filter(row=>row._2 ==1).map(row=>row._1)
     val loud = reduced.filter(row=>row._2==2).map(row=>row._1)
-    var c1 = (quiet.sum/quiet.count)
+    var c1 = quiet.sum/quiet.count
     if(c1.isNaN){
      c1 = c(0)
    }
-    var c2 = (medium.sum/medium.count)
+    var c2 = medium.sum/medium.count
     if(c2.isNaN){
      c2 = c(1)
    }
    
-   var c3 = (loud.sum/loud.count)
+   var c3 = loud.sum/loud.count
    if(c3.isNaN){
      c3 = c(2)
    }
@@ -67,20 +67,20 @@ object Clustering {
 
   }
 
-  def assignCentroids(frame:RDD[(String, String, Double, Int)],centroids:Array[Double]):RDD[(String, String, Double, Int)]= {
+  def assignCentroidsManhatten(frame:RDD[(String,Double, Int)], centroids:Array[Double]):RDD[(String,Double, Int)]= {
       println("In Assign Centroids")
       //println(centroids(1))
-      var f = frame.map(row => (row._1,row._2,row._3,getMinimumIndex(centroids,row._3)))
+      var f = frame.map(row => (row._1,row._2,getMinimumIndex(centroids,row._2)))
       return f
   }
 
-  def kmeans(frame : RDD [(String, String, Double, Int)]) : RDD[(String,String,Double,Int)] = {
-    var f : RDD[(String,String,Double,Int)] = frame
-    var centroids:Array[Double]  = Array(0.0,-10.0,-30.0)
+  def kmeansManhatten(frame : RDD [(String,Double, Int)]) : RDD[(String,Double,Int)] = {
+    var f : RDD[(String,Double,Int)] = frame
+    var centroids:Array[Double]  = Array(0.0,200.0,400.0)
     println("Calling kmeans")
-   for(i <- 1 to 20){
-      f = assignCentroids(frame,centroids)
-      centroids = updateCentroids(f,centroids)
+   for(i <- 1 to 10){
+      f = assignCentroidsManhatten(frame,centroids)
+      centroids = updateCentroid(f,centroids)
       for(j <- 0 to 2){
          println(centroids(j))
       }
@@ -127,12 +127,10 @@ object Clustering {
       pick up songId , song title and loudness from each row
       sortBy loudness and pick top 5
     */
-    val flines = lines.filter(row => isDoubleNumber(row(6)))
-    val loudnessValues = flines.map(row =>(row(23),row(24), row(6).toDouble,-1))
-    var frame = kmeans(loudnessValues)
-    frame.saveAsTextFile("output")
-
-
+    val flines = lines.filter(row => isDoubleNumber(row(7)))
+    val loudnessValues = flines.map(row =>(row(23), row(7).toDouble,-1))
+    var frame = kmeansManhatten(loudnessValues)
+    frame.saveAsTextFile("outputDuration")
 
 
   }
