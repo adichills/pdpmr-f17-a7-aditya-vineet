@@ -1,6 +1,6 @@
 # A7 - Clustering
 
-### Given Million Song Database analyze using Apache Spark
+### Given Million Song Database perform iterative computations, computations on a graph, learn basic clustering algorithms, using Apache Spark.
 
 ### Pre-requisite softwares:
 ***
